@@ -1,0 +1,104 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  // Connection pooling configuration for Vercel Postgres
+  // Optimizes database connections for serverless functions
+  relationMode = "prisma"
+}
+
+model User {
+  id          String        @id @default(cuid())
+  email       String        @unique
+  name        String?
+  provider    String        // 'google' | 'email'
+  createdAt   DateTime      @default(now())
+  lastLoginAt DateTime      @default(now())
+  sessions    ChatSession[]
+
+  @@index([email])
+}
+
+model ChatSession {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages  Message[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+}
+
+model Message {
+  id          String      @id @default(cuid())
+  sessionId   String
+  session     ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role        String      // 'user' | 'assistant'
+  content     String      @db.Text
+  timestamp   DateTime    @default(now())
+  apiKeyUsed  String?
+  apiKey      APIKey?     @relation(fields: [apiKeyUsed], references: [id])
+
+  @@index([sessionId])
+  @@index([apiKeyUsed])
+}
+
+model APIKey {
+  id           String      @id @default(cuid())
+  provider     String      // 'openai' | 'gemini' | 'anthropic'
+  encryptedKey String      @db.Text
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  lastUsedAt   DateTime?
+  usageLogs    UsageLog[]
+  messages     Message[]
+
+  @@index([provider])
+}
+
+model UsageLog {
+  id              String   @id @default(cuid())
+  apiKeyId        String
+  apiKey          APIKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  timestamp       DateTime @default(now())
+  tokensUsed      Int?
+  requestDuration Int      // milliseconds
+
+  @@index([apiKeyId])
+  @@index([timestamp])
+}
+
+model Admin {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  lastLoginAt  DateTime @default(now())
+
+  @@index([username])
+}
+
+model BlogPost {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  title           String
+  excerpt         String   @db.Text
+  content         String   @db.Text
+  metaDescription String   @db.Text
+  keywords        String   // JSON array as string
+  author          String   @default("AI FutureLinks Team")
+  featuredImage   String?  // URL to featured image
+  publishedAt     DateTime
+  updatedAt       DateTime @updatedAt
+
+  @@index([slug])
+  @@index([publishedAt])
+}
